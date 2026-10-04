@@ -17,6 +17,7 @@ Qwen2-VL-2B on the ConstructionSite 10k test split.
 | `scripts/02_run_baseline.py` | Runs the model on the test split, saves predictions |
 | `scripts/03_evaluate.py` | Per-rule precision / recall / F1 |
 | `slurm/baseline.sbatch` | Cluster job for steps 02 + 03 |
+| `notebooks/01_dataset_analysis.ipynb` | Explores the whole dataset: counts, attributes, image sizes, boxes, quality checks |
 
 ## Run order on the cluster
 

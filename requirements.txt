@@ -7,3 +7,6 @@ datasets
 pillow
 tqdm
 bitsandbytes
+# for notebooks/01_dataset_analysis.ipynb
+matplotlib
+notebook

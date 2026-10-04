@@ -28,6 +28,24 @@ def prf(tp, fp, fn):
 
 def evaluate(records):
     rows = []
+    # "Rule 0" = the image has no violation at all. The ConstructionSite 10k
+    # paper reports this class next to the four rules, so it is included here
+    # for comparison. It is not part of the macro / micro averages below.
+    tp = fp = fn = tn = 0
+    for rec in records:
+        gt = not any(bool(rec["gt"][str(k)]) for k in RULE_IDS)
+        pred = not any(rec["pred"][str(k)] is True for k in RULE_IDS)
+        if gt and pred:
+            tp += 1
+        elif pred:
+            fp += 1
+        elif gt:
+            fn += 1
+        else:
+            tn += 1
+    p, r, f1 = prf(tp, fp, fn)
+    rule0 = {"rule": "0 No violation", "support": tp + fn, "tp": tp, "fp": fp, "fn": fn,
+             "tn": tn, "unparsed": 0, "precision": p, "recall": r, "f1": f1}
     for k in RULE_IDS:
         tp = fp = fn = tn = unparsed = 0
         for rec in records:
@@ -62,7 +80,7 @@ def evaluate(records):
     macro = {m: sum(r[m] for r in rows) / len(rows) for m in ("precision", "recall", "f1")}
     tp, fp, fn = (sum(r[c] for r in rows) for c in ("tp", "fp", "fn"))
     micro = dict(zip(("precision", "recall", "f1"), prf(tp, fp, fn)))
-    return rows, macro, micro
+    return [rule0] + rows, macro, micro
 
 
 def main():
@@ -88,7 +106,7 @@ def main():
             f"{r['unparsed']:>9}{r['precision']:>8.3f}{r['recall']:>8.3f}{r['f1']:>8.3f}"
         )
     print("-" * len(head))
-    for name, m in (("Macro average", macro), ("Micro average", micro)):
+    for name, m in (("Macro average (rules 1-4)", macro), ("Micro average (rules 1-4)", micro)):
         print(f"{name:<59}{m['precision']:>8.3f}{m['recall']:>8.3f}{m['f1']:>8.3f}")
 
     out_csv = path.with_suffix(".metrics.csv")
@@ -97,7 +115,7 @@ def main():
         w.writeheader()
         for r in rows:
             w.writerow(r)
-        for name, m in (("macro", macro), ("micro", micro)):
+        for name, m in (("macro (rules 1-4)", macro), ("micro (rules 1-4)", micro)):
             w.writerow({"rule": name, **m})
     print(f"\nSaved {out_csv}")
 
