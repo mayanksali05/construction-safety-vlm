@@ -1,0 +1,9 @@
+# PyTorch is NOT listed here on purpose: plain `pip install torch` on
+# Windows gives the CPU-only build. Install the GPU build first:
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126
+transformers>=4.45.0
+accelerate
+datasets
+pillow
+tqdm
+bitsandbytes

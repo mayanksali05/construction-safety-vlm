@@ -1,0 +1,39 @@
+# --- Secrets and downloads (never commit) ---
+# hf_cache holds your Hugging Face login token, the dataset and the model.
+hf_cache/
+.env
+*.token
+
+# --- Python environments and caches ---
+venv-vlm/
+.venv/
+venv/
+pip_cache/
+tmp/
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+
+# --- Run outputs (predictions, metrics, sample images) ---
+outputs/*
+!outputs/.gitkeep
+logs/
+*.out
+*.err
+
+# --- Model weights and checkpoints (step 2 onwards) ---
+checkpoints/
+*.safetensors
+*.bin
+*.pt
+*.pth
+wandb/
+
+# --- Bundles and OS / editor files ---
+csvlm_code.zip
+*.zip
+Thumbs.db
+desktop.ini
+.DS_Store
+.vscode/
+.idea/
