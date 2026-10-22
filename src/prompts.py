@@ -141,3 +141,29 @@ def parse_rule_answer(text):
             pass
     m = re.search(r'rule_broken"?\s*[:=]\s*"?(yes|no|true|false)\b', text, flags=re.IGNORECASE)
     return (_to_bool(m.group(1)) if m else None), ""
+
+
+# Short yes/no prompts, one rule per question.
+# Question 1 is prompt 1 from Sahraoui (2025), "Automated Hazard Detection in
+# Construction Sites Using Large Language and Vision-Language Models"
+# (arXiv:2511.15720), which reports that Qwen2-VL-2B does better with short,
+# single-rule, yes/no prompts. That thesis covers the PPE rule only, and does
+# not print the exact rule line it appends, so:
+#   - the "Rule: ..." line here is our own wording of that line, and
+#   - questions 2-4 are our own, written in the same style.
+YESNO_QUESTIONS = {
+    1: "In the image, is anyone not wearing basic PPE?",
+    2: "In the image, is anyone working at height near an unprotected edge without a safety harness?",
+    3: "In the image, is there a deep excavation without edge protection or edge warning?",
+    4: "In the image, is any worker in the blind spot or within the operation radius of an excavator?",
+}
+
+
+def build_yesno_prompt(rule_id):
+    return f"{YESNO_QUESTIONS[rule_id]}\nRule: {RULES[rule_id]}\nAnswer only: Yes or No."
+
+
+def parse_yesno_answer(text):
+    """Model text -> (bool or None, ''). Uses the first yes/no word."""
+    m = re.search(r"\b(yes|no)\b", text, flags=re.IGNORECASE)
+    return (m.group(1).lower() == "yes" if m else None), ""

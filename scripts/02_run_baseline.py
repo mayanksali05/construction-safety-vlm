@@ -27,8 +27,10 @@ from src.data import ground_truth  # noqa: E402
 from src.prompts import (  # noqa: E402
     build_prompt,
     build_rule_prompt,
+    build_yesno_prompt,
     parse_answer,
     parse_rule_answer,
+    parse_yesno_answer,
 )  # noqa: E402
 from src.rules import DATASET_ID, RULE_IDS  # noqa: E402
 
@@ -118,10 +120,11 @@ def main():
     )
     ap.add_argument(
         "--mode",
-        choices=["joint", "per_rule"],
+        choices=["joint", "per_rule", "yes_no"],
         default="joint",
         help="joint: one question covering all 4 rules. per_rule: one question "
-        "per rule (4 per image), observation first, then yes/no.",
+        "per rule (4 per image), observation first, then yes/no. yes_no: one "
+        "short question per rule answered with a single Yes or No.",
     )
     ap.add_argument("--limit", type=int, default=None, help="only the first N images")
     ap.add_argument("--out", default=None)
@@ -153,8 +156,15 @@ def main():
 
     model, processor = load_model(args.model, args.max_pixels, args.load_4bit, args.dtype)
     prompt = build_prompt(short=args.short_answers)
-    if args.mode == "per_rule":
-        print("Prompt (rule 1 shown; one per rule):\n" + build_rule_prompt(1) + "\n")
+    build_one = {"per_rule": build_rule_prompt, "yes_no": build_yesno_prompt}.get(args.mode)
+    parse_one = {"per_rule": parse_rule_answer, "yes_no": parse_yesno_answer}.get(args.mode)
+    if args.mode == "yes_no":
+        args.max_new_tokens = min(args.max_new_tokens, 8)  # one word is enough
+    if build_one:
+        print("Prompts (one per rule):")
+        for k in RULE_IDS:
+            print(f"--- rule {k} ---\n{build_one(k)}")
+        print()
     else:
         print("Prompt:\n" + prompt + "\n")
 
@@ -165,12 +175,12 @@ def main():
             rows = [ds[i] for i in todo[start : start + args.batch_size]]
             images = [shrink(r["image"].convert("RGB"), args.max_pixels) for r in rows]
             t0 = time.time()
-            if args.mode == "per_rule":
+            if build_one:
                 outs, n_in, n_out = generate(
                     model,
                     processor,
                     [img for img in images for _ in RULE_IDS],
-                    [build_rule_prompt(k) for _ in images for k in RULE_IDS],
+                    [build_one(k) for _ in images for k in RULE_IDS],
                     args.max_new_tokens,
                 )
                 results = []
@@ -179,7 +189,7 @@ def main():
                     chunk = outs[i * n : (i + 1) * n]
                     pred, reasons = {}, {}
                     for k, t in zip(RULE_IDS, chunk):
-                        pred[k], reasons[k] = parse_rule_answer(t)
+                        pred[k], reasons[k] = parse_one(t)
                     raw = "\n".join(f"[rule {k}] {t}" for k, t in zip(RULE_IDS, chunk))
                     results.append((pred, reasons, raw))
             else:
