@@ -3,8 +3,8 @@
 Development of a Domain-Specific Vision-Language Model for Construction Site
 Safety Inspection (M.Tech major project, Nirma University).
 
-This repo currently covers **plan step 1: the zero-shot baseline** of
-Qwen2-VL-2B on the ConstructionSite 10k test split.
+This repo covers **plan step 1: the zero-shot baseline** of Qwen2-VL-2B on
+the ConstructionSite 10k test split, and **plan step 2: QLoRA fine-tuning**.
 
 ## Layout
 
@@ -16,6 +16,11 @@ Qwen2-VL-2B on the ConstructionSite 10k test split.
 | `scripts/01_inspect_dataset.py` | Downloads the dataset and checks counts against the paper |
 | `scripts/02_run_baseline.py` | Runs the model on the test split, saves predictions |
 | `scripts/03_evaluate.py` | Per-rule precision / recall / F1 |
+| `src/ft_data.py` | Validation hold-out and balanced training examples for fine-tuning |
+| `src/vlm.py` | Model loading (4-bit option) and prompt helpers for 04-05 |
+| `scripts/04_finetune.py` | QLoRA fine-tuning on the train split (resumable) |
+| `scripts/05_predict.py` | P(yes) per image and rule, for the base or fine-tuned model |
+| `scripts/06_thresholds.py` | Picks a threshold per rule on validation, applies it to test, prints AP |
 | `slurm/baseline.sbatch` | Cluster job for steps 02 + 03 |
 | `notebooks/01_dataset_analysis.ipynb` | Explores the whole dataset: counts, attributes, image sizes, boxes, quality checks |
 
@@ -96,6 +101,38 @@ python scripts\03_evaluate.py outputs\smoke.jsonl
   label reading, answer parsing and metric code were tested on synthetic
   data.
 
+## Step 2: fine-tuning (QLoRA)
+
+```bash
+# 1. Smoke test: 20 steps. Check the "supervised text" line and memory.
+python scripts/04_finetune.py --out-dir outputs/ft_smoke --max-steps 20
+
+# 2. Full run (1 epoch, about 490 optimizer steps). Same command resumes.
+python scripts/04_finetune.py --out-dir outputs/ft_qlora_r16
+
+# 3. Scores on the validation hold-out and the test split
+python scripts/05_predict.py --adapter outputs/ft_qlora_r16/final --split val
+python scripts/05_predict.py --adapter outputs/ft_qlora_r16/final --split test
+
+# 4. Thresholds from validation, metrics on test
+python scripts/06_thresholds.py --val outputs/pyes_ft_qlora_r16_val.jsonl --test outputs/pyes_ft_qlora_r16_test.jsonl
+python scripts/03_evaluate.py outputs/pyes_ft_qlora_r16_test.tuned.jsonl
+
+# 5. Same scoring for the base model, for a like-for-like comparison
+python scripts/05_predict.py --adapter none --split val
+python scripts/05_predict.py --adapter none --split test
+python scripts/06_thresholds.py --val outputs/pyes_base_val.jsonl --test outputs/pyes_base_test.jsonl
+python scripts/03_evaluate.py outputs/pyes_base_test.tuned.jsonl
+```
+
+- Training uses only the train split. 10% of it (709 images, fixed by a hash
+  of image_id) is held out for choosing thresholds. The test split is used
+  only for the final numbers.
+- The validation hold-out has few rare-rule violations (7 harness, 13 edge,
+  4 blind spot), so thresholds for those rules are rough. Average precision
+  (AP), printed by 06, does not need a threshold and is the steadier measure.
+- Training and scoring use the same yes/no prompt as the baseline.
+
 ## Dataset
 
 `LouisChen15/ConstructionSite` on HuggingFace. 7,009 train / 3,004 test
@@ -107,7 +144,6 @@ inspectors", Data-Centric Engineering, vol. 7, e11.
 
 ## Next steps (from the project plan)
 
-2. LoRA fine-tune on the train split; same evaluation.
 3. Add severity and corrective-action labels; fine-tune again.
 4. Add regulation citations (OSHA 29 CFR 1926, Indian OSH Code / BOCW).
 5. One comparison table.
